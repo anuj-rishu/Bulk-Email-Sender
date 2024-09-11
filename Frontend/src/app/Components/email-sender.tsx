@@ -1,17 +1,23 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Loader2, Send, Upload, Mail, Linkedin } from "lucide-react";
 import Papa from "papaparse";
 import axios from "axios";
 import Link from "next/link";
-import { toast, Toaster } from 'react-hot-toast';
+import { toast, Toaster } from "react-hot-toast";
 
 export default function EmailSender() {
   const [csvFile, setCsvFile] = useState<File | null>(null);
@@ -19,12 +25,13 @@ export default function EmailSender() {
   const [body, setBody] = useState("");
   const [isSending, setIsSending] = useState(false);
   const [fileName, setFileName] = useState("");
+  const [estimatedTime, setEstimatedTime] = useState<number | null>(null);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
-        const file = e.target.files[0];
-        setCsvFile(file);
-        setFileName(file.name);
+      const file = e.target.files[0];
+      setCsvFile(file);
+      setFileName(file.name);
     }
   };
 
@@ -41,36 +48,81 @@ export default function EmailSender() {
       skipEmptyLines: true,
       complete: (result) => {
         const userData = result.data;
-        sendDataToBackend(userData);
+        measureNetworkSpeed().then((networkSpeed) => {
+          const estimatedTime = calculateEstimatedTime(
+            userData.length,
+            networkSpeed
+          );
+          setEstimatedTime(estimatedTime);
+          sendDataToBackendInBatches(userData);
+        });
       },
     });
   };
 
-  const sendDataToBackend = (userData: unknown[]) => {
+  const measureNetworkSpeed = (): Promise<number> => {
+    return new Promise((resolve) => {
+      const image = new Image();
+      const startTime = new Date().getTime();
+      const imageUrl =
+        "https://www.google.com/images/branding/googlelogo/2x/googlelogo_color_92x30dp.png";
+      image.src = imageUrl + "?cache=" + startTime;
+      image.onload = () => {
+        const endTime = new Date().getTime();
+        const duration = (endTime - startTime) / 1000;
+        const imageSize = 92 * 30 * 4;
+        const speed = imageSize / duration;
+        resolve(speed);
+      };
+    });
+  };
+
+  const calculateEstimatedTime = (numRows: number, networkSpeed: number) => {
+    const timePerEmail = 1;
+    const networkFactor = 1000000 / networkSpeed;
+    return Math.ceil(numRows * timePerEmail * networkFactor);
+  };
+
+  const sendDataToBackendInBatches = async (userData: unknown[]) => {
     const emailApiUrl = process.env.NEXT_PUBLIC_EMAIL_API_URL;
-    
+
     if (!emailApiUrl) {
       console.error("Email API URL is not defined.");
       return;
     }
-    
-    axios
-      .post(emailApiUrl, {
-        users: userData,
-        subject,
-        body,
-      })
-      .then(() => {
-        toast.success("Emails sent successfully!");
-      })
-      .catch((error) => {
+
+    const batchSize = 10;
+    for (let i = 0; i < userData.length; i += batchSize) {
+      const batch = userData.slice(i, i + batchSize);
+      try {
+        await axios.post(emailApiUrl, {
+          users: batch,
+          subject,
+          body,
+        });
+        toast.success(`Batch ${i / batchSize + 1} sent successfully!`);
+      } catch (error) {
         console.error("Error sending emails:", error);
-        toast.error("Failed to send emails");
-      })
-      .finally(() => {
-        setIsSending(false);
-      });
+        toast.error(`Failed to send batch ${i / batchSize + 1}`);
+      }
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+    }
+
+    setIsSending(false);
+    setEstimatedTime(null);
   };
+
+  useEffect(() => {
+    let timer: NodeJS.Timeout;
+    if (isSending && estimatedTime !== null) {
+      timer = setInterval(() => {
+        setEstimatedTime((prevTime) =>
+          prevTime !== null && prevTime > 0 ? prevTime - 1 : null
+        );
+      }, 1000);
+    }
+    return () => clearInterval(timer);
+  }, [isSending, estimatedTime]);
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 p-4 font-sans">
@@ -179,7 +231,8 @@ export default function EmailSender() {
               {isSending ? (
                 <>
                   <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                  Sending...
+                  Sending...{" "}
+                  {estimatedTime !== null && `(${estimatedTime}s remaining)`}
                 </>
               ) : (
                 <>
@@ -192,12 +245,10 @@ export default function EmailSender() {
         </Card>
       </motion.div>
       <footer className="w-full text-center py-4 mt-4">
-        <p className="text-white text-sm">
-          Crafted by Anuj Rishu Tiwari
-        </p>
-        <Link 
-          href="https://www.linkedin.com/in/anuj-rishu" 
-          target="_blank" 
+        <p className="text-white text-sm">Crafted by Anuj Rishu Tiwari</p>
+        <Link
+          href="https://www.linkedin.com/in/anuj-rishu"
+          target="_blank"
           rel="noopener noreferrer"
           className="inline-flex items-center text-white hover:text-indigo-200 transition-colors duration-200 mt-2"
         >

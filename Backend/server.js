@@ -34,16 +34,16 @@ const sendEmail = async (email, name, subject, body) => {
   </body>
 `;
 
+  const mailOptions = {
+    from: process.env.EMAIL_USER,
+    to: email,
+    subject: subject,
+    html: emailTemplate,
+  };
 
-  
-const mailOptions = {
-  from: process.env.EMAIL_USER,
-  to: email,
-  subject: subject,
-  html: emailTemplate,
-};
-
-  return transporter.sendMail(mailOptions);
+  const info = await transporter.sendMail(mailOptions);
+  console.log(`Email sent to: ${email}`);
+  return info;
 };
 
 // Batch email sending
@@ -77,7 +77,7 @@ app.post('/api/send-emails', async (req, res) => {
   }
 });
 
-const PORT = process.env.PORT ||8000;
+const PORT = process.env.PORT || 8000;
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
 });
