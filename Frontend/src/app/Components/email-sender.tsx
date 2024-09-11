@@ -37,12 +37,11 @@ export default function EmailSender() {
     }
   };
 
-  const handleAttachmentChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files) {
-      setAttachments([...e.target.files]);
-    }
+    const handleAttachmentChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+      if (e.target.files) {
+          setAttachments(Array.from(e.target.files));
+      }
   };
-
   const handleUpload = () => {
     if (!csvFile || !subject || !body || !replyTo) {
       toast.error(
