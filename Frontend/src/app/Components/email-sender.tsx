@@ -196,7 +196,7 @@ export default function EmailSender() {
           Crafted by Anuj Rishu Tiwari
         </p>
         <Link 
-          href="https://www.linkedin.com/in/anuj-rishu-tiwari" 
+          href="https://www.linkedin.com/in/anuj-rishu" 
           target="_blank" 
           rel="noopener noreferrer"
           className="inline-flex items-center text-white hover:text-indigo-200 transition-colors duration-200 mt-2"
