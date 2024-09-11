@@ -47,8 +47,15 @@ export default function EmailSender() {
   };
 
   const sendDataToBackend = (userData: unknown[]) => {
+    const emailApiUrl = process.env.NEXT_PUBLIC_EMAIL_API_URL;
+    
+    if (!emailApiUrl) {
+      console.error("Email API URL is not defined.");
+      return;
+    }
+    
     axios
-      .post("https://bulk-email-sender-ecru.vercel.app/api/send-emails", {
+      .post(emailApiUrl, {
         users: userData,
         subject,
         body,
