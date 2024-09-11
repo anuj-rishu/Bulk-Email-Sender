@@ -48,7 +48,7 @@ export default function EmailSender() {
 
   const sendDataToBackend = (userData: unknown[]) => {
     axios
-      .post("http://localhost:8000/api/send-emails", {
+      .post("https://bulk-email-sender-ecru.vercel.app/api/send-emails", {
         users: userData,
         subject,
         body,
