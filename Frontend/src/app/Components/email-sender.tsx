@@ -23,6 +23,8 @@ export default function EmailSender() {
   const [csvFile, setCsvFile] = useState<File | null>(null);
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
+  const [replyTo, setReplyTo] = useState(''); // Added Reply-To state
+  const [attachments, setAttachments] = useState<File[]>([]); // Added state for attachments
   const [isSending, setIsSending] = useState(false);
   const [fileName, setFileName] = useState("");
   const [estimatedTime, setEstimatedTime] = useState<number | null>(null);
@@ -35,9 +37,17 @@ export default function EmailSender() {
     }
   };
 
+  const handleAttachmentChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+      setAttachments([...e.target.files]);
+    }
+  };
+
   const handleUpload = () => {
-    if (!csvFile || !subject || !body) {
-      toast.error("Please upload a CSV file and fill in the subject and body.");
+    if (!csvFile || !subject || !body || !replyTo) {
+      toast.error(
+        "Please upload a CSV file and fill in the subject, body, and reply-to address."
+      );
       return;
     }
 
@@ -95,11 +105,22 @@ export default function EmailSender() {
     for (let i = 0; i < userData.length; i += batchSize) {
       const batch = userData.slice(i, i + batchSize);
       try {
-        await axios.post(emailApiUrl, {
-          users: batch,
-          subject,
-          body,
+        const formData = new FormData();
+        formData.append("users", JSON.stringify(batch));
+        formData.append("subject", subject);
+        formData.append("body", body);
+        formData.append("replyTo", replyTo); // Attach reply-to address
+
+        attachments.forEach((file, index) => {
+          formData.append(`attachment_${index}`, file); // Attach files
         });
+
+        await axios.post(emailApiUrl, formData, {
+          headers: {
+            "Content-Type": "multipart/form-data",
+          },
+        });
+
         toast.success(`Batch ${i / batchSize + 1} sent successfully!`);
       } catch (error) {
         console.error("Error sending emails:", error);
@@ -127,12 +148,8 @@ export default function EmailSender() {
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 p-4 font-sans">
       <Toaster />
-      <div className="absolute inset-0 bg-white opacity-10 bg-[radial-gradient(#e5e7eb_1px,transparent_1px)] [background-size:16px_16px] [mask-image:radial-gradient(ellipse_50%_50%_at_50%_50%,#000_70%,transparent_100%)]"></div>
-
       <header className="w-full text-center py-6">
-        <h1 className="text-4xl font-bold text-white shadow-text">
-          Bulk Email Sender
-        </h1>
+        <h1 className="text-4xl font-bold text-white shadow-text">Bulk Email Sender</h1>
       </header>
       <motion.div
         initial={{ opacity: 0, y: 20 }}
@@ -152,10 +169,7 @@ export default function EmailSender() {
           <CardContent>
             <form className="space-y-6">
               <div className="space-y-2">
-                <Label
-                  htmlFor="csv-upload"
-                  className="text-sm font-medium text-gray-700"
-                >
+                <Label htmlFor="csv-upload" className="text-sm font-medium text-gray-700">
                   Upload CSV
                 </Label>
                 <div className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-md hover:border-indigo-500 transition-colors duration-300">
@@ -164,16 +178,10 @@ export default function EmailSender() {
                     <div className="flex text-sm text-gray-600">
                       <label
                         htmlFor="csv-upload"
-                        className="relative cursor-pointer bg-white rounded-md font-medium text-indigo-600 hover:text-indigo-500 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-indigo-500"
+                        className="relative cursor-pointer bg-white rounded-md font-medium text-indigo-600 hover:text-indigo-500"
                       >
                         <span>Upload a file</span>
-                        <Input
-                          id="csv-upload"
-                          type="file"
-                          accept=".csv"
-                          className="sr-only"
-                          onChange={handleFileChange}
-                        />
+                        <Input id="csv-upload" type="file" accept=".csv" className="sr-only" onChange={handleFileChange} />
                       </label>
                       <p className="pl-1">or drag and drop</p>
                     </div>
@@ -181,16 +189,12 @@ export default function EmailSender() {
                   </div>
                 </div>
                 {fileName && (
-                  <p className="mt-2 text-sm text-gray-500">
-                    Selected file: {fileName}
-                  </p>
+                  <p className="mt-2 text-sm text-gray-500">Selected file: {fileName}</p>
                 )}
               </div>
+
               <div className="space-y-2">
-                <Label
-                  htmlFor="subject"
-                  className="text-sm font-medium text-gray-700"
-                >
+                <Label htmlFor="subject" className="text-sm font-medium text-gray-700">
                   Subject
                 </Label>
                 <Input
@@ -203,11 +207,9 @@ export default function EmailSender() {
                   onChange={(e) => setSubject(e.target.value)}
                 />
               </div>
+
               <div className="space-y-2">
-                <Label
-                  htmlFor="body"
-                  className="text-sm font-medium text-gray-700"
-                >
+                <Label htmlFor="body" className="text-sm font-medium text-gray-700">
                   Email Body
                 </Label>
                 <Textarea
@@ -220,19 +222,45 @@ export default function EmailSender() {
                   onChange={(e) => setBody(e.target.value)}
                 />
               </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="reply-to" className="text-sm font-medium text-gray-700">
+                  Reply-To Email
+                </Label>
+                <Input
+                  id="reply-to"
+                  placeholder="Reply-to email address"
+                  required
+                  className="focus:ring-indigo-500 focus:border-indigo-500"
+                  type="email"
+                  value={replyTo}
+                  onChange={(e) => setReplyTo(e.target.value)}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="attachments" className="text-sm font-medium text-gray-700">
+                  Attach Files
+                </Label>
+                <Input
+                  id="attachments"
+                  type="file"
+                  multiple
+                  onChange={handleAttachmentChange}
+                />
+              </div>
             </form>
           </CardContent>
           <CardFooter>
             <Button
-              className="w-full bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white font-semibold py-2 px-4 rounded-md transition-all duration-300 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+              className="w-full bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white font-semibold py-2 px-4 rounded-md transition-all duration-300 ease-in-out transform hover:scale-105"
               onClick={handleUpload}
               disabled={isSending}
             >
               {isSending ? (
                 <>
                   <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                  Sending...{" "}
-                  {estimatedTime !== null && `(${estimatedTime}s remaining)`}
+                  Sending... {estimatedTime !== null && `(${estimatedTime}s remaining)`}
                 </>
               ) : (
                 <>
@@ -244,6 +272,7 @@ export default function EmailSender() {
           </CardFooter>
         </Card>
       </motion.div>
+
       <footer className="w-full text-center py-4 mt-4">
         <p className="text-white text-sm">Crafted by Anuj Rishu Tiwari</p>
         <Link
